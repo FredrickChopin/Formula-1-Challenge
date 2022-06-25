@@ -117,7 +117,7 @@ def QueryNumberThree():
         surname = input()
         ID = FindDriverId(forename, surname)
         if isinstance(ID, str):
-            print(id)
+            print(ID)
             ID = None
     elif choice == "id":
         print("enter id:")
@@ -146,7 +146,7 @@ def FindDriverId(forename, surname):
     driversDF = pd.read_csv(databasesPath + "drivers.csv")
     driversDF = driversDF.loc[(driversDF["forename"] == forename) & (driversDF["surname"] == surname)]
     resultLength = len(driversDF)
-    fullname = forename + surname
+    fullname = forename + " " + surname
     if resultLength == 0:
         return fullname + " was not found in the drivers database"
     if resultLength > 1:
