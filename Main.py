@@ -171,7 +171,7 @@ def ChooseSpecificDriver(DF, ID):
     #Gets a dataframe which has "driverID" column. Selects only the rows with the given ID
     return DF.loc[DF["driverId"] == ID]
 
-def AddLapInformation(resultsDF, ID, lapStatisticals = ["min", "max", "mean"]):
+def AddLapInformation(resultsDF, ID, lapStatisticals = ("min", "max", "mean")):
     #Adds the desired statistical information (given in lapStatisticals)
     # about the laps of a driver with a given ID
     #to resultsDF, which is an intermediate dataframe in our selection
@@ -186,9 +186,9 @@ def AddLapInformation(resultsDF, ID, lapStatisticals = ["min", "max", "mean"]):
     mergedDF.columns = ["raceId"] + [statistical + "_lap_time" for statistical in lapStatisticals]
     return pd.merge(resultsDF, mergedDF, on = "raceId")
 
-def AddPitStopsInformation(mergedDF, ID, pitStopsStatisticals = ["min", "max"]):
+def AddPitStopsInformation(mergedDF, ID, pitStopsStatisticals = ("min", "max")):
     #Adds the desired statistical information (given in pitStopsStatisticals)
-    # about the pit stops of a driver with a given ID
+    #about the pit stops of a driver with a given ID
     #to mergedDF, which is an intermediate dataframe in our selection
     pit_stopsDF = pd.read_csv(databasesPath + "pit_stops.csv")
     pit_stopsDF = ChooseSpecificDriver(pit_stopsDF, ID)
