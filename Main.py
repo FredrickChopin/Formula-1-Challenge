@@ -1,4 +1,6 @@
 import pandas as pd
+from fastapi import FastAPI, HTTPException, Path
+import json
 
 # DF is short for DataFrame
 databasesPath = "Databases\\"
@@ -10,45 +12,6 @@ def convertMillis(millis):
     minutes = int((millis / (1000 * 60)) % 60)
     tenths = int((temp - seconds) * 10)
     return str.format("{0}:{1}:{2}", str(minutes).zfill(2), str(seconds).zfill(2), tenths)
-
-def LetUserChoosePrintingOptions():
-    #This function is called before a dataframe is being printed out to the user
-    #If the user chooses full print the dataframe will be fully printed
-    #Otherwise, default printing options will be chosen
-    print("Would you like to print the table fully? (y / n)")
-    choice = input()
-    if choice == "y":
-        pd.set_option("display.max_rows", None)
-        pd.set_option("display.max_columns", None)
-    elif choice == "n":
-        pd.reset_option("display.max_rows")
-        pd.reset_option("display.max_columns")
-
-def QueryNumberOne():
-    #Question 2.a
-    print("Input the season (a year):")
-    year = input()
-    inputIsValid = True
-    try:
-        year = int(year)
-    except:
-        inputIsValid = False
-    if inputIsValid:
-        inputIsValid = SeasonIsValid(year)
-    if inputIsValid:
-        LetUserChoosePrintingOptions()
-        print("The best drivers of the series:\n")
-        print(GetBestDriversOfSeason(year))
-    else:
-        print("Invalid season. The season does not exist in the seasons database")
-
-def SeasonIsValid(seasonYear):
-    #Checks if a certain season exists in the seasons.csv file
-    seasonDF = pd.read_csv(databasesPath + "seasons.csv")
-    if seasonYear in seasonDF["year"].values:
-        return True
-    else:
-        return False
 
 def GetBestDriversOfSeason(year):
     #Main code for question 2.a
@@ -62,6 +25,7 @@ def GetBestDriversOfSeason(year):
 
 def MergeDriversRacesStandings(desiredYear = None):
     #Merges and returns the drivers, races, driver_standings files for further processing
+    print(databasesPath + "!!!!!!!!!!!!!")
     driversDF = pd.read_csv(databasesPath + "drivers.csv")
     racesDF = pd.read_csv(databasesPath + "races.csv")
     driver_standingsDF = pd.read_csv(databasesPath + "driver_standings.csv")
@@ -71,11 +35,6 @@ def MergeDriversRacesStandings(desiredYear = None):
     mergedDF = pd.merge(racesDF[["raceId", "year"]], driver_standingsDF[["raceId", "driverId", "wins"]], on="raceId")
     mergedDF = pd.merge(driversDF, mergedDF, on="driverId")
     return mergedDF
-
-def QueryNumberTwo():
-    #Code for question 2.b
-    LetUserChoosePrintingOptions()
-    print(GetAllTimeRanking())
 
 def GetAllTimeRanking(topN : int = 3):
     #Main code for question 2.b
@@ -104,35 +63,6 @@ def GetTopDriversByPointsInSeason(currYearGroup,topN : int):
     result = result.sort_values(by = "points", ascending=False)
     result = result.head(topN)
     return result
-
-def QueryNumberThree():
-    #Code for question 2.c
-    print("Would you like to enter fullname or id? (full / id)")
-    choice = input()
-    ID = None
-    if choice == "full":
-        print("Enter forename")
-        forename = input()
-        print("Enter surname")
-        surname = input()
-        ID = FindDriverId(forename, surname)
-        if isinstance(ID, str):
-            print(ID)
-            ID = None
-    elif choice == "id":
-        print("enter id:")
-        ID = input()
-        try:
-            ID = int(ID)
-            if not IDExistsInDrivers(ID):
-                ID = None
-                print("There does not exist a driver with id " + str(ID) + " in the drivers database")
-        except:
-            print("id must be an integer")
-            ID = None
-    if ID is not None:
-        LetUserChoosePrintingOptions()
-        print(GetAllRacesOfDriver(ID))
 
 def IDExistsInDrivers(ID):
     #Chekcs if there exists a driver with the given ID in the drivers.csv file
@@ -200,24 +130,39 @@ def AddPitStopsInformation(mergedDF, ID, pitStopsStatisticals = ("min", "max")):
     mergedDF = pd.merge(mergedDF, pit_stops_statistics, on = "raceId")
     return mergedDF
 
-def Main():
-    #Our program's entry point
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', None)
-    queries = [QueryNumberOne, QueryNumberTwo, QueryNumberThree] #This allows for future scalability
-    #If there is a new query, just add the query function to the queries list
-    queryRange = range(1, len(queries) + 1)
-    choiceString = "Choose the number of query: (" + str.join(" /", (str(i) for i in queryRange)) + ")"
-    while True:
-        print("Choose the number of query: (1 / 2 / 3)")
-        choice = input()
-        try:
-            choice = int(choice)
-            if choice not in queryRange:
-                raise Exception()
-        except:
-            print("Invalid choice\n")
-            continue
-        queries[choice - 1]()
+def SeasonInDatabase(seasonYear):
+    #Checks if a certain season exists in the seasons.csv file
+    seasonDF = pd.read_csv(databasesPath + "seasons.csv")
+    if seasonYear in seasonDF["year"].values:
+        return True
+    else:
+        return False
 
-Main()
+def ConvertDFToJSON(DF, orient = "records"):
+    return json.loads(DF.to_json(orient = orient))
+
+app = FastAPI()
+
+@app.get("/2.a/{year}")
+def DriversBySeason(year : int = Path(None, description="The year of the desired season")):
+    if not SeasonInDatabase(year):
+        raise HTTPException(status_code=404, detail="The year does not exist in the seasons database")
+    return ConvertDFToJSON(GetBestDriversOfSeason(year).reset_index())
+
+@app.get("/2.b")
+def SeasonsAllTimeRanking():
+    return ConvertDFToJSON(GetAllTimeRanking().reset_index(1))
+
+@app.get("/2.c/by-id/{ID}")
+def DriverProfileByID(ID : int = Path(None, description="The ID of the desired driver")):
+    if not IDExistsInDrivers(ID):
+        raise HTTPException(status_code=404, detail="The ID does not exist in the drivers database")
+    return ConvertDFToJSON(GetAllRacesOfDriver(ID))
+
+@app.get("/2.c/by-name/{forename}/{surname}")
+def DriverProfileByFullname(forename: str = Path(None, description="The forename of the driver"),
+                            surname: str = Path(None, description="The surname of the driver")):
+    ID = FindDriverId(forename, surname)
+    if isinstance(ID, str):
+        raise HTTPException(status_code=400, detail = ID)
+    return ConvertDFToJSON(GetAllRacesOfDriver(ID))
