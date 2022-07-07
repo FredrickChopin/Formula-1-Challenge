@@ -1,6 +1,6 @@
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Path
-import json
+from json import loads
 
 # DF is short for DataFrame
 databasesPath = "Databases\\"
